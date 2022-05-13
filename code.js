@@ -136,7 +136,7 @@ function calculate_v(p) {
 }
 
 function line_to_sink(p) {
-	for (let i=0;i<1000; i++) {
+	for (let i=0;i<2000; i++) {
 		
 		v = calculate_v(p);
 		v.normalize();
