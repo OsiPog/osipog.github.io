@@ -371,6 +371,7 @@ function touchStarted() {mousePressed();}
 function mouseReleased() {
 	mouseDrag = false;
 }
+function touchEnded() {mouseReleased();}
 
 function mouseDragged() {
 	if (mouseDrag) {
