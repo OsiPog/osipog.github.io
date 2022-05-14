@@ -273,7 +273,7 @@ function setup() {
 	densityLabel = createDiv("Liniendichte")
 	.parent(optionsDiv);	
 
-	densitySlider = createSlider(2, 40, 18, 1)
+	densitySlider = createSlider(5, 40, 18, 1)
 	.style("width", "60%")
 	.style("height", "30px")
 	.parent(optionsDiv);
