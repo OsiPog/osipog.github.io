@@ -140,18 +140,31 @@ function calculate_v(p) {
 }
 
 function line_to_sink(p) {
-
+	let iterations = MAX_ITERATIONS/2
 	let old_v = new Vec2()
 	let justGotOutOfBounds;
+	let inBounds;
 	
-	for (let i=0;i<MAX_LENGTH; i++) {
+	for (let i=0;i<iterations; i++) {
 		
 		v = calculate_v(p);
 		v.normalize();
 		v.scale(ACCURACY);
 		
+		if ((!inBounds) && (i > 0)) v.scale(OUTOFBOUNDS_MULTIPLIER);
+		
 		let p2 = p.copy()
 		p2.add(v);
+		v.normalize();
+		
+		inBounds =		(p.isInRange(0 - TRANSLATION.x,
+										0 - TRANSLATION.y,
+										width - TRANSLATION.x,
+										height - TRANSLATION.y) || 
+							p2.isInRange(0 - TRANSLATION.x,
+										0 - TRANSLATION.y,
+										width - TRANSLATION.x,
+										height - TRANSLATION.y))
 		
 		let last = false;
 		for (let pole of minusPoles) {
@@ -159,28 +172,32 @@ function line_to_sink(p) {
 			let sd = pole.sdf(p2)
 			
 			if (sd < ACCURACY) {
-				v.normalize();
 				v.scale(-sd)
 				p2.subtract(v);
 				last = true;
 			}
+			
+			if (i == iterations - 1) {
+				if (!inBounds) return;
+				
+				let toPole = p2.copy()
+				toPole.subtract(p);
+				toPole.normalize();
+
+				if (1 - toPole.dot(v) < 0.01 ) {
+					iterations += 10;
+				}
+				
+			}
 		}
 		
-		if (p.isInRange(0 - TRANSLATION.x,
-						0 - TRANSLATION.y,
-						width - TRANSLATION.x,
-						height - TRANSLATION.y) || 
-			p2.isInRange(0 - TRANSLATION.x,
-						0 - TRANSLATION.y,
-						width - TRANSLATION.x,
-						height - TRANSLATION.y)) {
+		if  (inBounds){
 			
 			justGotOutOfBounds = true;
 			
 			line(p.x, p.y, p2.x, p2.y);
 			
 			if ((i % ARROW_DENSITY == 0) && (!last) && (i != 0)) {
-				v.normalize();
 				let n = new Vec2(v.y, -v.x);
 				let a1 = v.copy();
 				let a2 = v.copy();
@@ -194,18 +211,19 @@ function line_to_sink(p) {
 				line(p2.x, p2.y, p2.x + a2.x, p2.y + a2.y);
 			}
 		}
-		
-		else if(justGotOutOfBounds) {
+		else if((justGotOutOfBounds) && (i > 20)) {
 			justGotOutOfBounds = false;
 			
 			let diff = v.copy();
 			diff.subtract(old_v);
 			//console.log(diff.length());
-			if (diff.length() < 0.01) return;
+			if (diff.length() < 0.002) {
+				return;
+			}
 		}
 
 		
-		if (last) break;
+		if (last || (i == MAX_ITERATIONS)) break;
 		
 		old_v = v;
 		p = p2.copy();
@@ -217,9 +235,9 @@ function line_to_sink(p) {
 
 
 
-let plusPoles;
-let minusPoles;
-let allPoles;
+let plusPoles = [];
+let minusPoles = [];
+let allPoles = [];
 
 let mouse;
 let zeroVec = new Vec2();
@@ -231,11 +249,12 @@ let TRANSLATION;
 
 let DENSITY;
 let ACCURACY = 5;
+let OUTOFBOUNDS_MULTIPLIER = 17;
 
 let ARROW_DENSITY = 10;
 let ARROW_LENGTH = 10;
 
-let MAX_LENGTH = 1000;
+let MAX_ITERATIONS = 500;
 
 let STROKE_WEIGHT = 1;
 
@@ -246,10 +265,10 @@ function setup() {
 	.position(0,0)
 	.class("optionsDiv");
 
-	densityLabel = createDiv("Liniendichte ")
+	densityLabel = createDiv("Liniendichte")
 	.parent(optionsDiv);	
 
-	densitySlider = createSlider(10, 30, 15, 1)
+	densitySlider = createSlider(2, 40, 18, 1)
 	.style("width", "60%")
 	.style("height", "30px")
 	.parent(optionsDiv);
@@ -275,18 +294,18 @@ function setup() {
 	.mouseClicked(removeMinus);
 	
 	plusPoles = [
-		new Pole(-width * 0.25, 0, true),
-	]
+		new Pole(-width * 0.05, 0, true),
+	];
 	minusPoles = [
-		new Pole(width * 0.25, 0, false),
-	]
+		new Pole(width * 0.05, 0, false),
+	];
 }
 
 function draw() {
 	resizeCanvas(window.innerWidth, window.innerHeight, true)
 	background(240);
 	
-	TRANSLATION = new Vec2(width/2, height/2)
+	TRANSLATION = new Vec2(width/2, height/2);
 	
 	allPoles = [...plusPoles, ...minusPoles];
 	
@@ -314,7 +333,7 @@ function draw() {
 // Button actions
 
 function addPlus() {
-	plusPoles.push(new Pole(0,0,true))
+	plusPoles.push(new Pole(0,0,true));
 }
 
 function removePlus() {
@@ -330,18 +349,24 @@ function removeMinus() {
 }
 
 
-// Handling the the dragging of the poles with the mouse
+// Handling the the dragging of the poles with the mouse (and touch)
 let mouseDrag;
 let draggedPole;
+document.ontouchmove = function(event) {
+	event.preventDefault();
+}
 
 function mousePressed() {
 	for (let pole of allPoles) {
 		if (pole.sdf(mouse) <= 0) {
 			draggedPole = pole;
 			mouseDrag = true;
+			return;
 		}
 	}
+	mouseDrag = false;
 }
+function touchStarted() {mousePressed();}
 
 function mouseReleased() {
 	mouseDrag = false;
@@ -352,3 +377,4 @@ function mouseDragged() {
 		draggedPole.become(mouse);
 	}
 }
+function touchMoved() {mouseDragged();}
