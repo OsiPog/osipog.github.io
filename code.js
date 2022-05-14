@@ -307,7 +307,8 @@ function setup() {
 }
 
 function draw() {
-	resizeCanvas(window.innerWidth, window.innerHeight, true)
+	// little hack to avoid scroll bars
+	resizeCanvas(window.innerWidth - 3, window.innerHeight - 3, true)
 	background(240);
 	
 	TRANSLATION = new Vec2(width/2, height/2);
