@@ -19,6 +19,10 @@ class Vec2 {
 		this.y /= len;
 	}
 	
+	dot(v) {
+		return this.x*v.x + this.y*v.y;
+	}
+	
 	abs() {
 		this.x = Math.abs(this.x);
 		this.y = Math.abs(this.y);
@@ -119,7 +123,7 @@ function calculate_v(p) {
 			return zeroVec.copy()
 		}
 		
-		let F = 8.987*10**9 * (1/pole.distance(p)**2);
+		let F = (1/pole.distance(p)**2); //* 8.987*10**9
 		let Fv = r
 		Fv.normalize()
 		Fv.scale(F);
@@ -136,7 +140,11 @@ function calculate_v(p) {
 }
 
 function line_to_sink(p) {
-	for (let i=0;i<2000; i++) {
+
+	let old_v = new Vec2()
+	let justGotOutOfBounds;
+	
+	for (let i=0;i<MAX_LENGTH; i++) {
 		
 		v = calculate_v(p);
 		v.normalize();
@@ -166,7 +174,9 @@ function line_to_sink(p) {
 						0 - TRANSLATION.y,
 						width - TRANSLATION.x,
 						height - TRANSLATION.y)) {
-		
+			
+			justGotOutOfBounds = true;
+			
 			line(p.x, p.y, p2.x, p2.y);
 			
 			if ((i % ARROW_DENSITY == 0) && (!last) && (i != 0)) {
@@ -184,10 +194,20 @@ function line_to_sink(p) {
 				line(p2.x, p2.y, p2.x + a2.x, p2.y + a2.y);
 			}
 		}
+		
+		else if(justGotOutOfBounds) {
+			justGotOutOfBounds = false;
+			
+			let diff = v.copy();
+			diff.subtract(old_v);
+			//console.log(diff.length());
+			if (diff.length() < 0.01) return;
+		}
 
 		
 		if (last) break;
 		
+		old_v = v;
 		p = p2.copy();
 		
 	}
@@ -214,6 +234,8 @@ let ACCURACY = 5;
 
 let ARROW_DENSITY = 10;
 let ARROW_LENGTH = 10;
+
+let MAX_LENGTH = 1000;
 
 let STROKE_WEIGHT = 1;
 
