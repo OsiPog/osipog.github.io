@@ -232,6 +232,11 @@ function line_to_sink(p) {
 	
 }
 
+function updateMousePos() {
+	mouse = new Vec2(mouseX - TRANSLATION.x, mouseY - TRANSLATION.y);
+}
+
+
 
 
 
@@ -311,7 +316,7 @@ function draw() {
 	
 	translate(TRANSLATION.x, TRANSLATION.y);
 	
-	mouse = new Vec2(mouseX - TRANSLATION.x, mouseY - TRANSLATION.y);
+	updateMousePos();
 	DENSITY = 1/densitySlider.value();	
 	
 
@@ -366,16 +371,23 @@ function mousePressed() {
 	}
 	mouseDrag = false;
 }
-function touchStarted() {mousePressed();}
+function touchStarted() {
+	updateMousePos();
+	mousePressed();
+}
 
 function mouseReleased() {
 	mouseDrag = false;
 }
-function touchEnded() {mouseReleased();}
+function touchEnded() {
+	mouseDrag = false;
+}
 
 function mouseDragged() {
 	if (mouseDrag) {
 		draggedPole.become(mouse);
 	}
 }
-function touchMoved() {mouseDragged();}
+function touchMoved() {
+	mouseDragged();
+}
