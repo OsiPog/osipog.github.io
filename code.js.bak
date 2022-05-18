@@ -72,6 +72,7 @@ class Pole extends Vec2 {
 		this.r = r;
 		this.d = d
 		this.shape = shape;
+		this.hits = [];
 	}
 	
 	sdf(p) {
@@ -90,6 +91,17 @@ class Pole extends Vec2 {
 		}
 		
 		return p;
+	}
+	tFromPointOnCircumference(p) {
+		let t;
+		
+		if (this.shape == 0) {
+			t = Math.atan2((p.y - this.y)/this.r, (p.x - this.x)/this.r);
+			//if (t < 0) t = 1 - abs(t);
+			t /= 6.28;
+		}
+		
+		return t;
 	}
 	
 	show() {
@@ -139,17 +151,19 @@ function calculate_v(p) {
 	
 }
 
-function line_to_sink(p) {
+function fieldLine(p, poleList) {
 	let iterations = MAX_ITERATIONS/2
 	let old_v = new Vec2()
 	let justGotOutOfBounds;
 	let inBounds;
+	let direction = 1;
+	if (poleList == plusPoles) direction = -1;
 	
 	for (let i=0;i<iterations; i++) {
 		
 		v = calculate_v(p);
 		v.normalize();
-		v.scale(ACCURACY);
+		v.scale(ACCURACY*direction);
 		
 		if ((!inBounds) && (i > 0)) v.scale(OUTOFBOUNDS_MULTIPLIER);
 		
@@ -167,7 +181,7 @@ function line_to_sink(p) {
 										height - TRANSLATION.y))
 		
 		let last = false;
-		for (let pole of minusPoles) {
+		for (let pole of poleList) {
 			
 			let sd = pole.sdf(p2)
 			
@@ -175,10 +189,17 @@ function line_to_sink(p) {
 				v.scale(-sd)
 				p2.subtract(v);
 				last = true;
+				
+				let hit = p2.copy();
+				hit.subtract(pole);
+				hit.normalize();
+				hit.scale(pole.r);
+				hit.add(pole);
+				pole.hits.push(hit);
 			}
 			
 			if (i == iterations - 1) {
-				if (!inBounds) return;
+				if (!inBounds) return false;
 				
 				let toPole = p2.copy()
 				toPole.subtract(p);
@@ -204,8 +225,8 @@ function line_to_sink(p) {
 				a1.add(n);
 				n.scale(-1);
 				a2.add(n);
-				a1.scale(-0.5*ARROW_LENGTH)
-				a2.scale(-0.5*ARROW_LENGTH)
+				a1.scale(-0.5*ARROW_LENGTH*direction)
+				a2.scale(-0.5*ARROW_LENGTH*direction)
 				
 				line(p2.x, p2.y, p2.x + a1.x, p2.y + a1.y);
 				line(p2.x, p2.y, p2.x + a2.x, p2.y + a2.y);
@@ -218,7 +239,7 @@ function line_to_sink(p) {
 			diff.subtract(old_v);
 			//console.log(diff.length());
 			if (diff.length() < 0.002) {
-				return;
+				return false;
 			}
 		}
 
@@ -229,11 +250,11 @@ function line_to_sink(p) {
 		p = p2.copy();
 		
 	}
-	
+	return false;
 }
 
 function updateMousePos() {
-	mouse = new Vec2(mouseX, mouseY);
+	mouse = new Vec2(mouseX - TRANSLATION.x, mouseY - TRANSLATION.y);
 }
 
 
@@ -259,7 +280,7 @@ let OUTOFBOUNDS_MULTIPLIER = 17;
 let ARROW_DENSITY = 10;
 let ARROW_LENGTH = 10;
 
-let MAX_ITERATIONS = 500;
+let MAX_ITERATIONS = 1000;
 
 let STROKE_WEIGHT = 1;
 
@@ -273,7 +294,7 @@ function setup() {
 	densityLabel = createDiv("Liniendichte")
 	.parent(optionsDiv);	
 
-	densitySlider = createSlider(2, 40, 18, 1)
+	densitySlider = createSlider(5, 40, 18, 1)
 	.style("width", "60%")
 	.style("height", "30px")
 	.parent(optionsDiv);
@@ -307,7 +328,8 @@ function setup() {
 }
 
 function draw() {
-	resizeCanvas(window.innerWidth, window.innerHeight, true)
+	// little hack to avoid scroll bars
+	resizeCanvas(window.innerWidth - 3, window.innerHeight - 3, true)
 	background(240);
 	
 	TRANSLATION = new Vec2(width/2, height/2);
@@ -318,20 +340,57 @@ function draw() {
 	
 	updateMousePos();
 	DENSITY = 1/densitySlider.value();	
-	
 
 	for (let pole of plusPoles) {
 		for (let t=0;t<1;t+=DENSITY) {
 			if (1-t < 0.0001) break; 
 			let p = pole.pointOnCircuference(t);
-			line_to_sink(p);
+			fieldLine(p, minusPoles);
 		}
+		pole.show();
 	}
 	
 	
-	for (let pole of allPoles) {
+	for (let pole of minusPoles) {
+		/*
+		for(let i=0;i<pole.hits.length;i++) {
+			let hit0 = pole.hits[i];
+			let hit1;
+			if (i == pole.hits.length -1) {
+				hit1 = pole.hits[0];
+			}
+			else {
+				hit1 = pole.hits[i+1];
+			}
+			
+			let t0 = pole.tFromPointOnCircumference(hit0);
+			let t1 = pole.tFromPointOnCircumference(hit1);
+			
+			if (Math.abs(t0 - t1) <= DENSITY) continue;
+			
+			while (t0 < t1) {
+				circle(hit0.x, hit0.y, 10);
+				circle(hit1.x, hit1.y, 10);
+				t0 += DENSITY;
+				if (t1 - t0 > DENSITY) {
+					let p = pole.pointOnCircuference(t0);
+					fieldLine(p, plusPoles);
+				}
+			}
+		}
+		*/
+		pole.hits = [];
 		pole.show();		
 	}
+	
+	line(mouse.x, mouse.y, minusPoles[0].x, minusPoles[0].y);
+	let p = mouse.copy();
+	p.subtract(minusPoles[0]);
+	p.normalize();
+	p.scale(minusPoles[0].r);
+	p.add(minusPoles[0]);
+	let t = minusPoles[0].tFromPointOnCircumference(p);
+	console.log(t);
 }
 
 
