@@ -96,9 +96,10 @@ class Pole extends Vec2 {
 		let t;
 		
 		if (this.shape == 0) {
-			t = Math.atan2((p.y - this.y)/this.r, (p.x - this.x)/this.r);
-			//if (t < 0) t = 1 - abs(t);
+			t = Math.atan2((p.y - this.y)/this.r, (p.x - this.x)/this.r);			
 			t /= 6.28;
+			
+			if (t < 0) t = 1 - abs(t);
 		}
 		
 		return t;
@@ -165,8 +166,6 @@ function fieldLine(p, poleList) {
 		v.normalize();
 		v.scale(ACCURACY*direction);
 		
-		if ((!inBounds) && (i > 0)) v.scale(OUTOFBOUNDS_MULTIPLIER);
-		
 		let p2 = p.copy()
 		p2.add(v);
 		v.normalize();
@@ -181,6 +180,7 @@ function fieldLine(p, poleList) {
 										height - TRANSLATION.y))
 		
 		let last = false;
+		let hitPole;
 		for (let pole of poleList) {
 			
 			let sd = pole.sdf(p2)
@@ -196,10 +196,12 @@ function fieldLine(p, poleList) {
 				hit.scale(pole.r);
 				hit.add(pole);
 				pole.hits.push(hit);
+				
+				hitPole = pole;
 			}
 			
 			if (i == iterations - 1) {
-				if (!inBounds) return false;
+				if (!inBounds) return;
 				
 				let toPole = p2.copy()
 				toPole.subtract(p);
@@ -239,18 +241,18 @@ function fieldLine(p, poleList) {
 			diff.subtract(old_v);
 			//console.log(diff.length());
 			if (diff.length() < 0.002) {
-				return false;
+				return;
 			}
 		}
 
 		
-		if (last || (i == MAX_ITERATIONS)) break;
+		if (last || (i == MAX_ITERATIONS)) return hitPole;
 		
 		old_v = v;
 		p = p2.copy();
 		
 	}
-	return false;
+	return;
 }
 
 function updateMousePos() {
@@ -275,7 +277,6 @@ let TRANSLATION;
 
 let DENSITY;
 let ACCURACY = 5;
-let OUTOFBOUNDS_MULTIPLIER = 17;
 
 let ARROW_DENSITY = 10;
 let ARROW_LENGTH = 10;
@@ -345,45 +346,20 @@ function draw() {
 		for (let t=0;t<1;t+=DENSITY) {
 			if (1-t < 0.0001) break; 
 			let p = pole.pointOnCircuference(t);
-			fieldLine(p, minusPoles);
+			let hit = fieldLine(p, minusPoles);
 		}
 		pole.show();
 	}
 	
 	
 	for (let pole of minusPoles) {
-		/*
-		for(let i=0;i<pole.hits.length;i++) {
-			let hit0 = pole.hits[i];
-			let hit1;
-			if (i == pole.hits.length -1) {
-				hit1 = pole.hits[0];
-			}
-			else {
-				hit1 = pole.hits[i+1];
-			}
-			
-			let t0 = pole.tFromPointOnCircumference(hit0);
-			let t1 = pole.tFromPointOnCircumference(hit1);
-			
-			if (Math.abs(t0 - t1) <= DENSITY) continue;
-			
-			while (t0 < t1) {
-				circle(hit0.x, hit0.y, 10);
-				circle(hit1.x, hit1.y, 10);
-				t0 += DENSITY;
-				if (t1 - t0 > DENSITY) {
-					let p = pole.pointOnCircuference(t0);
-					fieldLine(p, plusPoles);
-				}
-			}
-		}
-		*/
+
+		
 		pole.hits = [];
 		pole.show();		
 	}
 	
-	/*
+	
 	line(mouse.x, mouse.y, minusPoles[0].x, minusPoles[0].y);
 	let p = mouse.copy();
 	p.subtract(minusPoles[0]);
@@ -392,7 +368,7 @@ function draw() {
 	p.add(minusPoles[0]);
 	let t = minusPoles[0].tFromPointOnCircumference(p);
 	console.log(t);
-	*/
+	
 }
 
 
