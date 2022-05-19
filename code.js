@@ -105,6 +105,27 @@ class Pole extends Vec2 {
 		return t;
 	}
 	
+	tNextHitTo(p) {
+		let t0 = this.tFromPointOnCircumference(p);
+		let t1 = 1;
+		
+		let closestToZero = 1;
+		
+		for(let hit of this.hits) {
+			let hitT = this.tFromPointOnCircumference(hit);
+
+			if (hitT > t0) {
+				if (hitT-t0 < t1-t0) t1 = hitT;
+			}
+			if (hitT < closestToZero) closestToZero = hitT;
+		}
+		if (t1 == 1) {
+			return closestToZero + 1;
+		}
+		
+		return t1
+	}
+	
 	show() {
 		let c = [0,0,255]
 		if (this.source) c = [255, 0, 0];
@@ -152,7 +173,7 @@ function calculate_v(p) {
 	
 }
 
-function fieldLine(p, poleList) {
+function fieldLine(p, poleList, breakOnOutOfBounds = false) {
 	let iterations = MAX_ITERATIONS/2
 	let old_v = new Vec2()
 	let justGotOutOfBounds;
@@ -233,18 +254,7 @@ function fieldLine(p, poleList) {
 				line(p2.x, p2.y, p2.x + a1.x, p2.y + a1.y);
 				line(p2.x, p2.y, p2.x + a2.x, p2.y + a2.y);
 			}
-		}
-		else if((justGotOutOfBounds) && (i > 20)) {
-			justGotOutOfBounds = false;
-			
-			let diff = v.copy();
-			diff.subtract(old_v);
-			//console.log(diff.length());
-			if (diff.length() < 0.002) {
-				return;
-			}
-		}
-
+		} else if (breakOnOutOfBounds) return false;
 		
 		if (last || (i == MAX_ITERATIONS)) return hitPole;
 		
@@ -276,15 +286,16 @@ let accuracySlider;
 let TRANSLATION;
 
 let DENSITY;
-let ACCURACY = 5;
+let ACCURACY = 4;
 
-let ARROW_DENSITY = 10;
+let ARROW_DENSITY = 15;
 let ARROW_LENGTH = 10;
 
 let MAX_ITERATIONS = 1000;
 
 let STROKE_WEIGHT = 1;
 
+let sendSort = true;
 function setup() {
 	createCanvas(1280, 720);
 	
@@ -351,23 +362,34 @@ function draw() {
 		pole.show();
 	}
 	
+	// line(mouse.x, mouse.y, minusPoles[0].x, minusPoles[0].y);
+	// let p = mouse.copy();
+	// p.subtract(minusPoles[0]);
+	// p.normalize();
+	// p.scale(minusPoles[0].r);
+	// p.add(minusPoles[0]);
+	// let t = minusPoles[0].tNextHitTo(p);
+	// let hit = minusPoles[0].pointOnCircuference(t);
+	// fill([255,0,0]);
+	// circle(hit.x, hit.y,10);
+	// console.log(t, minusPoles[0].tFromPointOnCircumference(p));
 	
 	for (let pole of minusPoles) {
-
 		
+		for (let hit of pole.hits) {
+			let t0 = pole.tFromPointOnCircumference(hit);
+			let t1 = pole.tNextHitTo(hit);
+			
+			while (t1-t0 > DENSITY) {
+				t0 += DENSITY;
+				if (t1-t0 <= DENSITY*0.5) break;
+				let p = pole.pointOnCircuference(t0);
+				fieldLine(p, plusPoles, true);
+			}
+		}
 		pole.hits = [];
 		pole.show();		
 	}
-	
-	
-	line(mouse.x, mouse.y, minusPoles[0].x, minusPoles[0].y);
-	let p = mouse.copy();
-	p.subtract(minusPoles[0]);
-	p.normalize();
-	p.scale(minusPoles[0].r);
-	p.add(minusPoles[0]);
-	let t = minusPoles[0].tFromPointOnCircumference(p);
-	console.log(t);
 	
 }
 
