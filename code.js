@@ -73,11 +73,43 @@ class Pole extends Vec2 {
 		this.d = d
 		this.shape = shape;
 		this.hits = [];
+		
+		this.p2;
+	}
+	
+	closestPoint(p) {
+		if (this.shape == 0) return this.copy();
+		if (this.shape == 1) {
+			let dir = this.p2.copy()
+			dir.subtract(this);
+			
+			let len = dir.length();
+			
+			let pThis = this.copy();
+			pThis.subtract(p);
+			
+			let p2This = this.copy();
+			p2This.subtract(this.p2);
+			
+			
+			let h = min(1,max(0,pThis.dot(p2This)/(len**2)))
+			
+			//if (p.isEqual(mouse)) console.log(h);
+			
+			dir.scale(h);
+			dir.add(this);
+			
+			return dir;
+		}
 	}
 	
 	sdf(p) {
 		if (this.shape == 0) {
-			return this.distance(p) - this.r
+			return this.distance(p) - this.r;
+		}
+		if (this.shape == 1) {
+			let closest = this.closestPoint(p);
+			return closest.distance(p) - this.r;
 		}
 	}
 	
@@ -90,16 +122,47 @@ class Pole extends Vec2 {
 			p.y = Math.sin(t*6.28)*this.r + this.y;
 		}
 		
+		else if(this.shape == 1) {
+			let mid = this.p2.copy();
+			mid.subtract(this);
+			mid.scale(0.5);
+			mid.add(this);
+			
+			let ring = new Vec2();
+			ring.x = Math.cos(t*6.28)*(this.distance(this.p2)+this.r)/2 + mid.x;
+			ring.y = Math.sin(t*6.28)*(this.distance(this.p2)+this.r)/2 + mid.y;
+			
+			let closest = this.closestPoint(ring);
+			let dir = ring.copy();
+			dir.subtract(closest);
+			dir.normalize();
+			dir.scale(this.r);
+			
+			closest.add(dir);
+			p = closest;
+		}
+		
 		return p;
 	}
 	tFromPointOnCircumference(p) {
 		let t;
 		
 		if (this.shape == 0) {
-			t = Math.atan2((p.y - this.y)/this.r, (p.x - this.x)/this.r);			
-			t /= 6.28;
+			t = Math.atan2((p.y - this.y)/this.r, (p.x - this.x)/this.r)/6.28;			
 			
 			if (t < 0) t = 1 - abs(t);
+		}
+		else if (this.shape == 1) {
+			let mid = this.p2.copy();
+			mid.subtract(this);
+			mid.scale(0.5);
+			mid.add(this);
+			
+			let dir = p.copy();
+			dir.subtract(mid);
+			dir.normalize();
+			
+			t = Math.atan2(dir.y, dir.x)/6.28;
 		}
 		
 		return t;
@@ -131,16 +194,53 @@ class Pole extends Vec2 {
 		if (this.source) c = [255, 0, 0];
 		fill(c);
 		
+		let signPos;
+		
 		if (this.shape == 0) {
 			circle(this.x, this.y, this.r*2);
+			signPos = this.copy();
+		}
+		else if (this.shape == 1) {
+			let dir = this.p2.copy();
+			dir.subtract(this);
+			
+			dir.scale(0.5)
+			
+			signPos = this.copy();
+			signPos.add(dir);
+			
+			dir.normalize();
+			let n = new Vec2(dir.y, -dir.x)
+			n.scale(this.r);
+			
+			let A = this.copy();
+			A.add(n);
+			let B = this.copy();
+			B.subtract(n);
+			let C = this.p2.copy();
+			C.add(n);
+			let D = this.p2.copy();
+			D.subtract(n);
+			
+
+			beginShape();
+			vertex(A.x, A.y);
+			stroke(0);
+			vertex(C.x, C.y);
+			vertex(D.x, D.y);
+			stroke(1);
+			vertex(B.x, B.y);
+			endShape();
+			circle(this.x, this.y, this.r*2);
+			circle(this.p2.x, this.p2.y, this.r*2);
 		}
 		
 		let length = 0.5 *this.r;
 		
 		strokeWeight(5);
-		line(this.x - length, this.y, this.x + length, this.y);
+		line(signPos.x - length, signPos.y, signPos.x + length, signPos.y);
 		if (this.source) {
-			line(this.x, this.y - length, this.x, this.y + length);
+			line(signPos.x, signPos.y - length, signPos.x, signPos.y + length);
 		}
 		strokeWeight(STROKE_WEIGHT);
 	}
@@ -151,13 +251,13 @@ function calculate_v(p) {
 	let v = new Vec2()
 	for (let pole of allPoles) {
 		let r = p.copy();
-		r.subtract(pole);
+		r.subtract(pole.closestPoint(p));
 		
 		if (r.isEqual(zeroVec)) {
 			return zeroVec.copy()
 		}
 		
-		let F = (1/pole.distance(p)**2); //* 8.987*10**9
+		let F = (1/(pole.sdf(p)+pole.r)**2); //* 8.987*10**9
 		let Fv = r
 		Fv.normalize()
 		Fv.scale(F);
@@ -291,7 +391,7 @@ let ACCURACY = 4;
 let ARROW_DENSITY = 15;
 let ARROW_LENGTH = 10;
 
-let MAX_ITERATIONS = 1000;
+let MAX_ITERATIONS = 500;
 
 let STROKE_WEIGHT = 1;
 
@@ -320,7 +420,17 @@ function setup() {
 	.class("sliderText")
 	.parent(optionsDiv)
 	.mouseClicked(addMinus);
+	/*
+	changePlusPoleButton = createButton("Pluspol &#228ndern")
+	.class("sliderText")
+	.parent(optionsDiv)
+	.mouseClicked(changePlus);
 
+	changeMinusPoleButton = createButton("Minuspol &#228ndern")
+	.class("sliderText")
+	.parent(optionsDiv)
+	.mouseClicked(changeMinus);
+	*/
 	removePlusPoleButton = createButton("Pluspol entfernen")
 	.class("sliderText")
 	.parent(optionsDiv)
@@ -412,6 +522,28 @@ function removeMinus() {
 	minusPoles.pop();
 }
 
+function changePlus() {
+	changePole(plusPoles);
+}
+function changeMinus() {
+	changePole(minusPoles);
+}
+
+function changePole(poleList) {
+	let lastPole = poleList[plusPoles.length -1]
+	if (lastPole.shape == 0) {
+		if (!lastPole.p2) {
+			lastPole.p2 = new Vec2(lastPole.x, lastPole.y + 200);
+		}
+		lastPole.shape = 1;
+		return;
+	}
+	else if (lastPole.shape == 1) {
+		lastPole.shape = 0;
+		return;
+	}
+}
+
 
 // Handling the the dragging of the poles with the mouse (and touch)
 let mouseDrag;
@@ -422,8 +554,14 @@ document.ontouchmove = function(event) {
 
 function mousePressed() {
 	for (let pole of allPoles) {
-		if (pole.sdf(mouse) <= 0) {
+		let mouseInP2 = false;
+		if (pole.shape == 1) {
+			controlPole = new Pole(pole.p2.x, pole.p2.y)
+			mouseInP2 = controlPole.sdf(mouse) <= 0;
+		}
+		if ((pole.sdf(mouse) <= 0) || mouseInP2) {
 			draggedPole = pole;
+			if (mouseInP2) draggedPole = pole.p2;
 			mouseDrag = true;
 			return;
 		}
